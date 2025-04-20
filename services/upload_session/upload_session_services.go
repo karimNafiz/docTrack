@@ -4,27 +4,38 @@ import (
 	db "docTrack/config"
 	upload_session_model "docTrack/models/upload_sessions"
 	"errors"
-	"math"
+	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/google/uuid"
 )
 
-var path string = "need to set it later"
+var tempUploadDir string = "temp_uploads"
 
-func InitUploadSession(filename string, fileSize int64, chunkSize int) (*upload_session_model.UploadSession, error) {
-	var uploadSession upload_session_model.UploadSession
+const defaultChunkSize = 5 << 20 // this is basically short for 5 * (1 << 20) , (1 << 20) is basically 2^20 as we are shifting 20 bits
 
-	uploadSession = upload_session_model.UploadSession{
-		ID:           uuid.NewString(),
-		Filename:     filename,
-		File_size:    fileSize,
-		Chunk_size:   chunkSize,
-		Total_chunks: int(math.Ceil(float64(fileSize) / float64(chunkSize))),
+func InitUploadSession(filename string, fileSize int64) (*upload_session_model.UploadSession, error) {
+
+	var totalChunkSize int = int((fileSize + int64(defaultChunkSize-1)) / int64(defaultChunkSize)) // this is more efficient version of math.ceil which is for float
+
+	uploadSession := upload_session_model.UploadSession{
+		ID:          uuid.NewString(),
+		Filename:    filename,
+		FileSize:    fileSize,
+		ChunkSize:   defaultChunkSize,
+		TotalChunks: totalChunkSize,
 	}
 
 	if err := db.DB.Create(&uploadSession).Error; err != nil {
 		return nil, err
+	}
+
+	// need to make the temporary Directory
+	if err := os.MkdirAll(filepath.Join(tempUploadDir, uploadSession.ID), 0755); err != nil {
+		// could not create the temporary directory, need to delete the database entry
+		db.DB.Delete(&upload_session_model.UploadSession{}, "id = ?", uploadSession.ID)
+		return nil, errors.New("could not create tempory directory for upload")
 	}
 
 	return &uploadSession, nil
@@ -43,15 +54,16 @@ func WriteChunkAt(uploadID string, chunkNo int, data []byte) error {
 		return err
 	}
 
-	if chunkNo > uploadSession.Total_chunks {
+	if chunkNo >= uploadSession.TotalChunks || chunkNo < 0 {
 		return errors.New(" no of chunks have exceeded the total no of chunks ")
 	}
 
-	if len(data) > uploadSession.Chunk_size {
+	if len(data) > uploadSession.ChunkSize {
 		return errors.New(" the chunk size exceeds the pre-defined chunk size ")
 	}
+	partPath := filepath.Join(filepath.Join(tempUploadDir, uploadSession.ID), fmt.Sprintf("%06d.part", chunkNo))
 
-	err = writeChunkAt(path, data, int64(uploadSession.Chunk_size*chunkNo))
+	err = writeChunkAt(partPath, data, int64(uploadSession.ChunkSize)*int64(chunkNo))
 	return err
 
 }

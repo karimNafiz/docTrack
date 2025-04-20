@@ -19,12 +19,17 @@ type requestBody struct {
 // registering users through a post method
 
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+	// close the body when we are done
+	// so the tcp connection can be re-used
+	defer r.Body.Close()
+
 	var body requestBody
 
 	// Decode and validate incoming json
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 
 		http.Error(w, "Invalid JSON body ", http.StatusBadRequest)
+		return
 	}
 
 	if body.Role == "" {
@@ -45,6 +50,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	// important
+	defer r.Body.Close()
+
 	var body requestBody
 
 	// decode the incoming JSON
