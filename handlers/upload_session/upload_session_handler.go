@@ -89,3 +89,30 @@ func UplodaChunk(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent) // 204 = success, no body
 
 }
+
+func CompleteUploadSession(w http.ResponseWriter, r *http.Request) {
+	// need to notify go that the tcp connection can be re-used
+	// or else if all the data is not read from the network stream
+	// the tcp connection will stay open untill the garbage collector collects it
+	defer r.Body.Close()
+
+	// need the uploadID
+	vars := mux.Vars(r)
+	uploadID := vars["uploadID"]
+
+	if uploadID == "" {
+		http.Error(w, "invalid upload ID ", http.StatusBadRequest)
+	}
+	// right now im going to set a single status code for any errors
+	// but i should distinguish between server errors- 500 and unprocessableEntity- 422
+
+	if err := upload_session_service.UploadSessionFinalConfirmation(uploadID); err != nil {
+		http.Error(w, "unprocessable entity ", http.StatusUnprocessableEntity)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(&map[string]string{
+		"message": "UploadComplete",
+	})
+
+}

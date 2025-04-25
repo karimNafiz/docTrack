@@ -15,7 +15,14 @@ func SetupRouter() *mux.Router {
 	router.HandleFunc("/register", user_handler.RegisterHandler).Methods("POST")
 	router.HandleFunc("/login", user_handler.LoginHandler).Methods("POST")
 
-	router.HandleFunc("/initUpload", upload_session_handler.InitUploadSession).Methods("POST")
+	router.HandleFunc("/upload", upload_session_handler.InitUploadSession).Methods("POST")
+
+	// we need a router for /upload/{uploadID}/chunk?index = smth
+	// we need to use regex
+	router.HandleFunc("/upload/{uploadID:[0-9a-fA-F\\-]+}/chunk", upload_session_handler.UplodaChunk).Methods("POST")
+	router.HandleFunc("/upload/{uploadID:[0-9a-fA-F\\-]+}/complete", upload_session_handler.CompleteUploadSession).Methods("POST")
+
+	// need a handler for uploading chunks
 
 	return router
 }
