@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	utils "docTrack/utils"
+
 	"github.com/google/uuid"
 )
 
@@ -88,8 +90,8 @@ func UploadSessionFinalConfirmation(uploadID string) error {
 	tempDownloadPath := filepath.Join(tempUploadDir, uploadID)
 	err := uploadSessionFinalConfirmation(uploadID, tempDownloadPath)
 	if err != nil {
-		// DelUploadSessionFrmUploadID(uploadID)
-		// clearDirectory(tempDownloadPath)
+		DelUploadSessionFrmUploadID(uploadID)
+		clearDirectory(tempDownloadPath)
 		fmt.Println("error : " + err.Error())
 	}
 	return err
@@ -186,5 +188,35 @@ func clearDirectory(directory string) error {
 		}
 	}
 	return nil
+
+}
+
+// need to create pdf out of all the uploaded parts
+
+// i have a map of chunk no, and the file name and the suffix
+// use that to
+
+func mergeChunksIntoPDF(chunkDict *map[int]string, upload_session *upload_session_model.UploadSession, path string) error {
+
+	dictLen := len(*chunkDict)
+
+	if dictLen <= 0 {
+		return errors.New("chunkDict dictionary is empty ")
+	}
+
+	// loop through the entries
+	// from 0 to len(chunkDict - 1)
+	for i := range dictLen {
+		fileName := (*chunkDict)[i]
+		in, err := os.Open(filepath.Join(path, fileName))
+		if err != nil {
+			// need to decide what to do
+			return err
+		}
+		// need to close the stream
+		defer in.Close()
+
+		utils.ReadBytes(in, "4KB")
+	}
 
 }

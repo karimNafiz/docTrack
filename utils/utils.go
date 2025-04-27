@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 
@@ -55,29 +54,70 @@ func VerifyTokens(tokenString string) (*jwt.MapClaims, error) {
 
 }
 
-// the function takes a io.Reader
-// the buffer size (buffSize) everytime it makes read call it will at max read data buffSize bytes of data
-// the outSize is the amount of data you want to read
-// the reason im taking a pointer to a slice is becuasae after appending if the
-// underlying data is shifted the pointer to the start of the contiguous memory won't be the same
-// but the byte slice passed to this function frm outside this function will still point to the older start
-func ReadBytes(stream io.Reader, buffSize string, outBuff []byte) ([]byte, error) {
+// parseByteSize parses strings like "4B", "5KB", "12 MB", "3GB"
+// and returns the corresponding byte count as an int.
+func parseByteSize(sizeStr string) (int, error) {
+	s := strings.TrimSpace(sizeStr)
+	sUp := strings.ToUpper(s)
 
-	readByteSize, err := parseByteSize(buffSize)
+	const (
+		B  = 1
+		KB = 1 << 10
+		MB = 1 << 20
+		GB = 1 << 30
+	)
+
+	var (
+		unit       string
+		multiplier int64
+	)
+
+	switch {
+	case strings.HasSuffix(sUp, "GB"):
+		unit = "GB"
+		multiplier = GB
+	case strings.HasSuffix(sUp, "MB"):
+		unit = "MB"
+		multiplier = MB
+	case strings.HasSuffix(sUp, "KB"):
+		unit = "KB"
+		multiplier = KB
+	case strings.HasSuffix(sUp, "B"):
+		unit = "B"
+		multiplier = B
+	default:
+		return 0, fmt.Errorf("unknown unit in %q", sizeStr)
+	}
+
+	numPart := strings.TrimSpace(sUp[:len(sUp)-len(unit)])
+	if numPart == "" {
+		return 0, fmt.Errorf("missing number before %q", unit)
+	}
+	n, err := strconv.ParseInt(numPart, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid number %q: %w", numPart, err)
+	}
+
+	total := n * multiplier
+	if total > int64(^uint(0)>>1) {
+		return 0, fmt.Errorf("size %d%s too large", n, unit)
+	}
+	return int(total), nil
+}
+
+// ReadBytes reads from the io.Reader in chunks of size buffSize (e.g. "4KB"),
+// appending each to outBuff and returning the full byte slice.
+func ReadBytes(stream io.Reader, buffSize string, outBuff []byte) ([]byte, error) {
+	// 1) Parse the buffer size once
+	bufSize, err := parseByteSize(buffSize)
 	if err != nil {
 		return nil, err
 	}
-	var readBuff []byte
-	switch v := readByteSize.(type) {
-	case int:
-		// v is already int
-		readBuff = make([]byte, v)
 
-	case int64:
-		// v is already int64
-		// but make([]byte, int(v)) if you really must convert
-		readBuff = make([]byte, v)
-	}
+	// 2) Allocate a single reusable buffer of that exact size
+	readBuff := make([]byte, bufSize)
+
+	// 3) Loop until EOF, appending each read to outBuff
 	for {
 		n, err := stream.Read(readBuff)
 		if n > 0 {
@@ -87,62 +127,35 @@ func ReadBytes(stream io.Reader, buffSize string, outBuff []byte) ([]byte, error
 			break
 		}
 		if err != nil {
-			log.Fatalf("read error: %v ", err)
-			return nil, err
+			return nil, fmt.Errorf("read error: %w", err)
 		}
-
 	}
 	return outBuff, nil
 }
 
-// parseByteSize parses strings like "4B", "5kb", "12 MB", "3GB"
-// and returns either an int (if it fits) or an int64.
-func parseByteSize(sizeStr string) (interface{}, error) {
-	s := strings.TrimSpace(sizeStr)
-	sUp := strings.ToUpper(s)
-
-	// Map units to their byte-size constants (mixed int / int64).
-	unitMap := map[string]interface{}{
-		"B":  BytesInBytes,
-		"KB": KiloBytesInBytes,
-		"MB": MegaBytesInBytes,
-		"GB": GigaBytesInBytes,
+func WriteBytes(stream io.Writer, buffSize string, data []byte) error {
+	// 1) Parse the buffer size (e.g. “4KB” → 4096)
+	bufSize, err := parseByteSize(buffSize)
+	if err != nil {
+		return err
 	}
 
-	// Try longer suffixes first so "KB" matches before "B".
-	// todo make a list of all the keys
-	// and not hard code this
-	for _, u := range []string{"GB", "MB", "KB", "B"} {
-		if strings.HasSuffix(sUp, u) {
-			numPart := strings.TrimSpace(sUp[:len(sUp)-len(u)])
-			if numPart == "" {
-				return nil, fmt.Errorf("missing number before %q", u)
-			}
-			n, err := strconv.ParseInt(numPart, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid number %q: %w", numPart, err)
-			}
+	// 2) Compute how many writes we need (ceiling of dataLen/bufSize)
+	dataLen := len(data)
+	noIOCalls := (dataLen + (bufSize - 1)) / bufSize
 
-			// Decide whether to use int or int64.
-			maxInt := int64(int(^uint(0) >> 1))
-			switch v := unitMap[u].(type) {
-			case int:
-				total := n * int64(v)
-				if total <= maxInt {
-					return int(total), nil
-				}
-				return total, nil // too big for int, return int64
-			case int64:
-				total := v * n
-				if total <= maxInt {
-					return int(total), nil
-				}
-				return total, nil
-			default:
-				return nil, fmt.Errorf("unsupported unit type %T", v)
-			}
+	// 3) Loop with a classic for-loop
+	for i := 0; i < noIOCalls; i++ {
+		offset := i * bufSize
+		limit := offset + bufSize
+		if limit > dataLen {
+			limit = dataLen
+		}
+		// Write it—and wrap any error with context
+		if _, err := stream.Write(data[offset:limit]); err != nil {
+			return fmt.Errorf("write chunk %d failed: %w", i, err)
 		}
 	}
 
-	return nil, fmt.Errorf("unknown unit in %q", sizeStr)
+	return nil
 }
