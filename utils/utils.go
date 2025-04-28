@@ -56,7 +56,7 @@ func VerifyTokens(tokenString string) (*jwt.MapClaims, error) {
 
 // parseByteSize parses strings like "4B", "5KB", "12 MB", "3GB"
 // and returns the corresponding byte count as an int.
-func parseByteSize(sizeStr string) (int, error) {
+func ParseByteSize(sizeStr string) (int, error) {
 	s := strings.TrimSpace(sizeStr)
 	sUp := strings.ToUpper(s)
 
@@ -79,7 +79,6 @@ func parseByteSize(sizeStr string) (int, error) {
 	case strings.HasSuffix(sUp, "MB"):
 		unit = "MB"
 		multiplier = MB
-	case strings.HasSuffix(sUp, "KB"):
 		unit = "KB"
 		multiplier = KB
 	case strings.HasSuffix(sUp, "B"):
@@ -107,11 +106,11 @@ func parseByteSize(sizeStr string) (int, error) {
 
 // ReadBytes reads from the io.Reader in chunks of size buffSize (e.g. "4KB"),
 // appending each to outBuff and returning the full byte slice.
-func ReadBytes(stream io.Reader, buffSize string, outBuff []byte) ([]byte, error) {
+func ReadBytes(stream io.Reader, buffSize string, callBack func([]byte) error) error {
 	// 1) Parse the buffer size once
-	bufSize, err := parseByteSize(buffSize)
+	bufSize, err := ParseByteSize(buffSize)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// 2) Allocate a single reusable buffer of that exact size
@@ -121,21 +120,24 @@ func ReadBytes(stream io.Reader, buffSize string, outBuff []byte) ([]byte, error
 	for {
 		n, err := stream.Read(readBuff)
 		if n > 0 {
-			outBuff = append(outBuff, readBuff[:n]...)
+			err := callBack(readBuff)
+			if err != nil {
+				return err
+			}
 		}
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("read error: %w", err)
+			return fmt.Errorf("read error: %w", err)
 		}
 	}
-	return outBuff, nil
+	return nil
 }
 
 func WriteBytes(stream io.Writer, buffSize string, data []byte) error {
 	// 1) Parse the buffer size (e.g. “4KB” → 4096)
-	bufSize, err := parseByteSize(buffSize)
+	bufSize, err := ParseByteSize(buffSize)
 	if err != nil {
 		return err
 	}
@@ -158,4 +160,44 @@ func WriteBytes(stream io.Writer, buffSize string, data []byte) error {
 	}
 
 	return nil
+}
+
+func Copy(reader io.Reader, writer io.Writer) (int64, error) { // in the future, have another parameter for buffer size
+
+	// 1. Create buffer
+	buffer := make([]byte, 32*(1<<20)) // or default if empty
+
+	// 2. Track total bytes written
+	var totalWritten int64 = 0
+
+	// 3. Loop to read and write
+	for {
+		n, readErr := reader.Read(buffer)
+
+		if n > 0 {
+			writeN, writeErr := writer.Write(buffer[:n])
+			totalWritten += int64(writeN)
+
+			if writeN != n {
+				// Important: handle partial writes
+				// If writeN != n, then we have to write the remaining bytes
+				// (very rare but CAN happen with some writers like network streams)
+				// Optional at first: panic or error out
+				return totalWritten, io.ErrShortWrite
+			}
+
+			if writeErr != nil {
+				return totalWritten, fmt.Errorf("write error: %w", writeErr)
+			}
+		}
+
+		if readErr != nil {
+			if readErr == io.EOF {
+				break // Clean EOF
+			}
+			return totalWritten, fmt.Errorf("read error: %w", readErr)
+		}
+	}
+
+	return totalWritten, nil
 }

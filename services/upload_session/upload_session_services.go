@@ -15,8 +15,8 @@ import (
 	"github.com/google/uuid"
 )
 
-var tempUploadDir string = "temp_uploads"
-
+const tempUploadDir = "temp_uploads"
+const finalPDFDir = "pdfs"
 const defaultChunkSize = 5 << 20 // this is basically short for 5 * (1 << 20) , (1 << 20) is basically 2^20 as we are shifting 20 bits
 const uploadFileExt = ".part"
 
@@ -87,13 +87,14 @@ func writeChunkAt(path string, data []byte, _ int64) error {
 }
 
 func UploadSessionFinalConfirmation(uploadID string) error {
+
 	tempDownloadPath := filepath.Join(tempUploadDir, uploadID)
-	err := uploadSessionFinalConfirmation(uploadID, tempDownloadPath)
-	if err != nil {
-		DelUploadSessionFrmUploadID(uploadID)
+	defer func() {
 		clearDirectory(tempDownloadPath)
-		fmt.Println("error : " + err.Error())
-	}
+		DelUploadSessionFrmUploadID(uploadID)
+	}()
+	err := uploadSessionFinalConfirmation(uploadID, tempDownloadPath)
+
 	return err
 }
 
@@ -119,7 +120,7 @@ func uploadSessionFinalConfirmation(uploadID string, tempDownloadPath string) er
 
 	totalChunks := 0
 	var totalFileSize int64 = 0
-	fileNumberSet := make(map[int]struct{})
+	fileNumberSet := make(map[int]string)
 
 	for _, e := range entries {
 		// if its a directory then we skip
@@ -134,7 +135,7 @@ func uploadSessionFinalConfirmation(uploadID string, tempDownloadPath string) er
 			if err != nil {
 				return fmt.Errorf(" file is corrupted \n actual error %w ", err)
 			}
-			fileNumberSet[fileNumber] = struct{}{}
+			fileNumberSet[fileNumber] = fileName
 			totalChunks++
 			info, err := e.Info()
 			if err != nil {
@@ -166,7 +167,7 @@ func uploadSessionFinalConfirmation(uploadID string, tempDownloadPath string) er
 		}
 	}
 
-	return nil
+	return mergeChunksIntoPDF(&fileNumberSet, &uploadSession, tempDownloadPath, finalPDFDir)
 
 }
 
@@ -191,32 +192,51 @@ func clearDirectory(directory string) error {
 
 }
 
-// need to create pdf out of all the uploaded parts
-
-// i have a map of chunk no, and the file name and the suffix
-// use that to
-
-func mergeChunksIntoPDF(chunkDict *map[int]string, upload_session *upload_session_model.UploadSession, path string) error {
-
-	dictLen := len(*chunkDict)
-
-	if dictLen <= 0 {
-		return errors.New("chunkDict dictionary is empty ")
+func mergeChunksIntoPDF(chunkDict *map[int]string, uploadSession *upload_session_model.UploadSession, tempDir string, finalPDFDir string) error {
+	// Grab the map and length
+	fmt.Println("starting to merge part files into pdf ")
+	dict := *chunkDict
+	total := len(dict)
+	if total == 0 {
+		fmt.Println("chunkDict dictionary is empty")
+		return errors.New("chunkDict dictionary is empty")
 	}
 
-	// loop through the entries
-	// from 0 to len(chunkDict - 1)
-	for i := range dictLen {
-		fileName := (*chunkDict)[i]
-		in, err := os.Open(filepath.Join(path, fileName))
-		if err != nil {
-			// need to decide what to do
-			return err
+	// 2) Create (or truncate) the final PDF and ensure it’s closed
+	finalPath := filepath.Join(finalPDFDir, uploadSession.Filename)
+	out, err := os.Create(finalPath)
+	if err != nil {
+		fmt.Println(fmt.Errorf("could not create final PDF %q: %w", finalPath, err))
+		return fmt.Errorf("could not create final PDF %q: %w", finalPath, err)
+	}
+	defer out.Close()
+
+	// 3) Iterate from chunk 0 up to TotalChunks-1
+	for i := 0; i < uploadSession.TotalChunks; i++ {
+		// ensure we have a filename for this index
+		name, ok := dict[i]
+		if !ok {
+			fmt.Println(fmt.Errorf("missing chunk %d for upload %s", i, uploadSession.ID))
+			return fmt.Errorf("missing chunk %d for upload %s", i, uploadSession.ID)
 		}
-		// need to close the stream
-		defer in.Close()
 
-		utils.ReadBytes(in, "4KB")
+		// 4) Open the part file and make sure it’s closed promptly
+		partPath := filepath.Join(tempDir, name)
+		in, err := os.Open(partPath)
+		if err != nil {
+			fmt.Println(fmt.Errorf("could not open chunk %d at %q: %w", i, partPath, err))
+			return fmt.Errorf("could not open chunk %d at %q: %w", i, partPath, err)
+		}
+
+		// 5) Copy its bytes into the final PDF using your Copy()
+		if _, err := utils.Copy(in, out); err != nil {
+			in.Close()
+			fmt.Println(fmt.Errorf("failed to copy chunk %d: %w", i, err))
+			return fmt.Errorf("failed to copy chunk %d: %w", i, err)
+		}
+		in.Close()
 	}
 
+	// 6) All done
+	return nil
 }
