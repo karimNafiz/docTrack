@@ -13,6 +13,8 @@ import (
 	utils "docTrack/utils"
 
 	"github.com/google/uuid"
+
+	pdf_service "docTrack/services/pdf"
 )
 
 const tempUploadDir = "temp_uploads"
@@ -238,5 +240,7 @@ func mergeChunksIntoPDF(chunkDict *map[int]string, uploadSession *upload_session
 	}
 
 	// 6) All done
-	return nil
+	// write now im jus using a fixed, hard coded, temporary, userID, ill link it later on
+	_, err = pdf_service.CreatePDF(1, uploadSession.Filename, finalPDFDir, uploadSession.FileSize, 0)
+	return err
 }

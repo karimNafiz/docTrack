@@ -38,7 +38,18 @@ func CreateUser(username, password, role string) error {
 }
 
 func FindUserByUsername(username string) (*users_model.User, error) {
-	var user users_model.User
-	err := db.DB.Where("username = ?", username).First(&user).Error
-	return &user, err
+
+	// at first i was doing
+	// var user *users_model.User
+	// and passing it into gorm
+	// but gorm was complaining cuz it was a null pointer
+	user := new(users_model.User)
+	err := db.DB.Where("username = ?", username).First(user).Error
+	return user, err
+}
+
+func FindUserByID(userID uint) (*users_model.User, error) {
+	user := new(users_model.User)
+	err := db.DB.Where("id = ?", userID).First(user).Error
+	return user, err
 }
