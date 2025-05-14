@@ -1,6 +1,7 @@
 package routes
 
 import (
+	folder_handler "docTrack/handlers/folder"
 	upload_session_handler "docTrack/handlers/upload_session"
 	user_handler "docTrack/handlers/users"
 
@@ -14,6 +15,8 @@ func SetupRouter() *mux.Router {
 	// no middleware required
 	router.HandleFunc("/register", user_handler.RegisterHandler).Methods("POST")
 	router.HandleFunc("/login", user_handler.LoginHandler).Methods("POST")
+
+	router.HandleFunc("/folder", folder_handler.CreateFolderHandler).Methods("POST")
 
 	router.HandleFunc("/upload", upload_session_handler.InitUploadSession).Methods("POST", "OPTIONS")
 
