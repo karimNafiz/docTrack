@@ -9,12 +9,19 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	utils "docTrack/utils"
 
 	"github.com/google/uuid"
 
+	logger "docTrack/logger"
 	pdf_service "docTrack/services/pdf"
+
+	folder_errors "docTrack/errors/folder"
+	folder_service "docTrack/services/folder"
+
+	os_inhouse "docTrack/os"
 )
 
 const tempUploadDir = "temp_uploads"
@@ -22,32 +29,86 @@ const finalPDFDir = "pdfs"
 const defaultChunkSize = 5 << 20 // this is basically short for 5 * (1 << 20) , (1 << 20) is basically 2^20 as we are shifting 20 bits
 const uploadFileExt = ".part"
 
-func InitUploadSession(filename string, fileSize int64) (*upload_session_model.UploadSession, error) {
+// InitUploadSession initializes a new upload session for a given file.
+// It creates a database entry for tracking the upload and also creates
+// a temporary directory on disk where file chunks will be stored.
+//
+// It runs the database creation and file system operations in parallel,
+// waits for both to finish, and performs rollback on partial failure.
+func InitUploadSession(filename string, userID uint, parentID uint, fileSize int64) (*upload_session_model.UploadSession, error) {
+	logger.InfoLogger.Printf("started upload session for file %s ", filename)
 
-	fmt.Println("inside intit uploadSession method ")
-	var totalChunkSize int = int((fileSize + int64(defaultChunkSize-1)) / int64(defaultChunkSize)) // this is more efficient version of math.ceil which is for float
+	// Calculate the number of chunks the file will be divided into.
+	// This is equivalent to math.Ceil(fileSize / chunkSize), but done using integers.
+	totalChunks := int((fileSize + int64(defaultChunkSize-1)) / int64(defaultChunkSize))
 
+	// Step 1: Validate that the parent folder exists in the database.
+	if _, err := folder_service.GetFolderByID(parentID); err != nil {
+		logger.ErrorLogger.Println(folder_errors.ErrInvalidFolderID)
+		return nil, folder_errors.ErrInvalidFolderID
+	}
+
+	// Step 2: Construct the upload session model.
 	uploadSession := upload_session_model.UploadSession{
-		ID:          uuid.NewString(),
-		Filename:    filename,
-		FileSize:    fileSize,
-		ChunkSize:   defaultChunkSize,
-		TotalChunks: totalChunkSize,
+		ID:          uuid.NewString(), // Unique session ID
+		UserID:      userID,           // Uploader's user ID
+		ParentID:    parentID,         // Parent folder ID
+		Filename:    filename,         // Name of the uploaded file
+		FileSize:    fileSize,         // Total file size in bytes
+		ChunkSize:   defaultChunkSize, // Standard chunk size (constant)
+		TotalChunks: totalChunks,      // Number of chunks calculated
 	}
 
-	if err := db.DB.Create(&uploadSession).Error; err != nil {
-		return nil, err
+	// Declare variables to hold the potential errors from each parallel task.
+	var (
+		wg    sync.WaitGroup // Used to wait for both goroutines
+		dbErr error          // Error from database insertion
+		fsErr error          // Error from filesystem folder creation
+	)
+
+	// Add two tasks to the WaitGroup
+	wg.Add(2)
+
+	// Step 3: Spawn a goroutine to create the upload session in the database.
+	go func() {
+		defer wg.Done() // Mark this task as done when the goroutine finishes
+		dbErr = createUploadSessionRecord(&uploadSession)
+	}()
+
+	// Step 4: Spawn a goroutine to create the temporary upload directory on disk.
+	go func() {
+		defer wg.Done() // Mark this task as done when the goroutine finishes
+		fsErr = os_inhouse.CreateFolder(tempUploadDir, uploadSession.ID)
+	}()
+
+	// Step 5: Wait for both goroutines to complete
+	wg.Wait()
+
+	// Step 6: Handle any errors that occurred during the goroutines
+	if dbErr != nil || fsErr != nil {
+		// If the database creation succeeded but the folder creation failed
+		if dbErr == nil {
+			// Roll back the database entry to maintain consistency
+			_ = db.DB.Delete(&upload_session_model.UploadSession{}, "id = ?", uploadSession.ID).Error
+		}
+
+		// If the folder creation succeeded but the database insert failed
+		if fsErr == nil {
+			// Remove the temporary folder to avoid orphaned data
+			_ = os.RemoveAll(filepath.Join(tempUploadDir, uploadSession.ID))
+		}
+
+		// Return the actual error that occurred (prefer DB error if both failed)
+		if dbErr != nil {
+			logger.ErrorLogger.Println(dbErr)
+			return nil, dbErr
+		}
+		logger.ErrorLogger.Println(fsErr)
+		return nil, fsErr
 	}
 
-	// need to make the temporary Directory
-	if err := os.MkdirAll(filepath.Join(tempUploadDir, uploadSession.ID), 0755); err != nil {
-		// could not create the temporary directory, need to delete the database entry
-		db.DB.Delete(&upload_session_model.UploadSession{}, "id = ?", uploadSession.ID)
-		return nil, errors.New("could not create tempory directory for upload")
-	}
-
+	// Step 7: Return the initialized upload session (both tasks succeeded)
 	return &uploadSession, nil
-
 }
 
 //TODO need to delete the upload session if there are any errors
@@ -243,4 +304,12 @@ func mergeChunksIntoPDF(chunkDict *map[int]string, uploadSession *upload_session
 	// write now im jus using a fixed, hard coded, temporary, userID, ill link it later on
 	_, err = pdf_service.CreatePDF(1, uploadSession.Filename, finalPDFDir, uploadSession.FileSize, 0)
 	return err
+}
+
+func createUploadSessionRecord(session *upload_session_model.UploadSession) error {
+	if err := db.DB.Create(session).Error; err != nil {
+		logger.ErrorLogger.Printf("failed to create upload session record: %v", err)
+		return err
+	}
+	return nil
 }

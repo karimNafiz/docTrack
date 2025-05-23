@@ -2,6 +2,7 @@ package main
 
 import (
 	DB "docTrack/config"
+	logger "docTrack/logger"
 	routes "docTrack/routes"
 	"log"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 func main() {
 
+	logger.Init()
 	dsn := "host=localhost user=postgres password=260322 dbname=DocTrack port=5432 sslmode=disable"
 	if err := DB.InitDB(dsn); err != nil {
 		log.Fatal("failed to connect to database ", err)

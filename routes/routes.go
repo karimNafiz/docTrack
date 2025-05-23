@@ -27,5 +27,6 @@ func SetupRouter() *mux.Router {
 
 	// need a handler for uploading chunks
 
+	router.HandleFunc("/copy", folder_handler.CopyFolderHandler).Methods("POST")
 	return router
 }

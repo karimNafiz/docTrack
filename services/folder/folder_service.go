@@ -4,7 +4,9 @@ import (
 	db "docTrack/config"
 	folder_errors "docTrack/errors/folder"
 	user_errors "docTrack/errors/user"
+	logger "docTrack/logger"
 	folder_model "docTrack/models/folders"
+	os_inhouse "docTrack/os"
 	user_service "docTrack/services/user"
 	"errors"
 	"fmt"
@@ -19,56 +21,72 @@ import (
 // collapse any sequence of invalid chars into one hyphen
 var invalidRe = regexp.MustCompile(`[\x00-\x1F/\\:*?"<>|]+`)
 
-func CreateFolder(folderName string, ownerID uint, parentID uint) (*folder_model.Folder, error) {
+func CreateFolder(flderName string, ownerID uint, parentID uint) (*folder_model.Folder, error) {
 
-	// need to check the length too
-
-	if folderName == "" {
+	// making sure the foler name is valid
+	if flderName == "" {
 		return nil, folder_errors.ErrInvalidFolderName
 	}
+	// if the folder name already exists
+	// we just add a number after the folder name
+	// imagine we have a folder called x
+	// if we create another folder named x, this will make sure the folder name is x_1
+	// imagine we also have x_1
+	// then we will have x_2
 	var count uint8 = 0
+	var folderName string = flderName
 	for checkIsFileNameExist(folderName, ownerID, parentID) {
 		count++
-		folderName = fmt.Sprintf("%s_%d", folderName, count)
+		folderName = fmt.Sprintf("%s_%d", flderName, count)
 	}
-
-	fmt.Println("checked if the file name existis or not ")
 
 	// TODO: remove this later
 	// need to check if users exists or not
 	// this is temporary code, remove this later
 	_, err := user_service.FindUserByID(ownerID)
 	if err != nil {
+		logger.ErrorLogger.Println(err)
 		return nil, user_errors.GetErrInvalidUserID(ownerID)
 	}
-	fmt.Println("user validated ")
 
-	// need to get the parent Folder record frm the database
-	// if it doesnt exist then we return a error
+	// we also need to check if the parent folder also exists in the database
 	var parentFolderPtr *folder_model.Folder
 	parentFolderPtr, err = GetFolderByID(parentID)
 
 	if err != nil {
+		logger.ErrorLogger.Println(err)
 		return nil, err
 	}
-	fmt.Println(" got the parent folder ////////////////////////////////////////////////// ")
+	slug := getSlugFrmFolderName(folderName)
+	parentFolderPath := getFolderMaterializedPath(parentFolderPtr)
+	err = os_inhouse.CreateFolder(parentFolderPath, slug)
+
+	if err != nil {
+		logger.ErrorLogger.Println(err)
+		return nil, err
+	}
 
 	// I can now create the folder
 	folderNew := folder_model.Folder{
 		Name:                   folderName,
-		Slug:                   getSlugFrmFolderName(folderName),
+		Slug:                   slug,
 		OwnerID:                ownerID,
 		ParentID:               parentID,
 		Depth:                  parentFolderPtr.Depth + 1,
-		ParentMaterializedPath: getFolderMaterializedPath(parentFolderPtr),
+		ParentMaterializedPath: parentFolderPath,
 	}
 	err = db.DB.Create(&folderNew).Error
-	fmt.Println("error in creating the folder ", err)
+
+	if err != nil {
+		logger.ErrorLogger.Println(err)
+	} else {
+		logger.DebugLogger.Printf("created record id %d in table %s ", folderNew.ID, "folders")
+	}
 	return &folderNew, err
 
 }
 
-func CopyFolder(folderID uint, ownerID uint, dstFolderID uint) {
+func CopyFolder(folderID uint, ownerID uint, dstFolderID uint) error {
 
 	// get the original folder struct, from the database
 	// so imagine we have the folder structure
@@ -80,8 +98,9 @@ func CopyFolder(folderID uint, ownerID uint, dstFolderID uint) {
 	// from the database
 	originalFolderStructPtr, err := GetFolderByID(folderID)
 	if err != nil {
-		fmt.Println("the folder ID of the folder to be copied is invalid ")
-		return // something sensible
+		// TODO make an error about invalid Folder ID
+		logger.ErrorLogger.Println(err)
+		return err
 	}
 
 	// using the originalFolderStructPtr we create a duplicate Folder
@@ -92,8 +111,8 @@ func CopyFolder(folderID uint, ownerID uint, dstFolderID uint) {
 	duplicateFolderStructPtr, err := CreateFolder(originalFolderStructPtr.Name, ownerID, dstFolderID)
 
 	if err != nil {
-		fmt.Println(" error in top level folder duplicate")
-		return // something sensible
+		logger.ErrorLogger.Println(err)
+		return err // something sensible
 	}
 	// get the path to the Original Folder in the server
 	// because we need to duplicate it's content
@@ -101,15 +120,16 @@ func CopyFolder(folderID uint, ownerID uint, dstFolderID uint) {
 
 	// in the copyFolderRecursive function we need to pass the path to the original folder in the server
 	// then as parent we need to pass the ptr to duplicateFolderStruct
-	copyFolderRecursive(originalFolderPath, duplicateFolderStructPtr, ownerID)
+	return copyFolderRecursive(originalFolderPath, duplicateFolderStructPtr, ownerID)
 
 }
 
-func copyFolderRecursive(originalFolderPath string, parentFolderPtr *folder_model.Folder, ownerID uint) {
+func copyFolderRecursive(originalFolderPath string, parentFolderPtr *folder_model.Folder, ownerID uint) error {
 	// read the entries from the originalFolderPath
 	entries, err := os.ReadDir(originalFolderPath)
 	if err != nil {
-		return // something sensible
+		logger.ErrorLogger.Println(err)
+		return err // something sensible
 	}
 	// loop through all the entries
 	for _, entry := range entries {
@@ -128,13 +148,19 @@ func copyFolderRecursive(originalFolderPath string, parentFolderPtr *folder_mode
 		childFolderName := entry.Name()
 		// so we create a duplicate in the database
 		// get a pointer to the struct
-		childFolderPtr, err := CreateFolder(childFolderName, parentFolderPtr.ID, ownerID)
+		childFolderPtr, err := CreateFolder(childFolderName, ownerID, parentFolderPtr.ID)
 		if err != nil {
-			return // something sensible
+			logger.ErrorLogger.Println(err)
+			return err // something sensible
 		}
 		// continue recursively calling this function
-		copyFolderRecursive(filepath.Join(originalFolderPath, entry.Name()), childFolderPtr, ownerID)
+		err = copyFolderRecursive(filepath.Join(originalFolderPath, entry.Name()), childFolderPtr, ownerID)
+		if err != nil {
+			logger.ErrorLogger.Println(err)
+			return err
+		}
 	}
+	return nil
 }
 
 func copyFile() {}
