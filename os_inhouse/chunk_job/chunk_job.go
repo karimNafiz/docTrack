@@ -5,7 +5,9 @@ package chunk_job
 
 import (
 	"context"
+	logger "docTrack/logger"
 	"fmt"
+	"os"
 	"sync"
 )
 
@@ -23,6 +25,10 @@ type chunkJob struct {
 	data       []byte // Raw payload bytes for this chunk
 }
 
+func (job chunkJob) println() string {
+	return fmt.Sprintf("chunk Job with upload ID %s and chunk no %d ", job.uploadID, job.chunkNO)
+}
+
 // -----------------------------------------------------------------------------
 // Singleton buffered channel container
 // -----------------------------------------------------------------------------
@@ -30,7 +36,7 @@ type chunkJob struct {
 // bufferedChunkJobChannelStruct wraps our channel so we can attach methods
 // and hide the raw channel behind a singleton API.
 type bufferedChunkJobChannelStruct struct {
-	jobs chan chunkJob // buffered channel carrying chunkJob instances
+	jobs chan *chunkJob // buffered channel carrying chunkJob instances
 }
 
 var (
@@ -47,7 +53,7 @@ var (
 func InstantiateBufferedChunkJobChannel(bufferSize uint) {
 	once.Do(func() {
 		bufferedChunkJobChannelInstance = &bufferedChunkJobChannelStruct{
-			jobs: make(chan chunkJob, bufferSize),
+			jobs: make(chan *chunkJob, bufferSize),
 		}
 	})
 }
@@ -94,7 +100,7 @@ func StartWorkerPool(ctx context.Context, poolSize uint) error {
 // this call will block until a worker frees up space.
 //
 // Returns an error if the channel hasn't been initialized.
-func AddChunkJob(job chunkJob) error {
+func AddChunkJob(job *chunkJob) error {
 	if bufferedChunkJobChannelInstance == nil {
 		return fmt.Errorf("chunk job channel not initialized; call InstantiateBufferedChunkJobChannel first")
 	}
@@ -115,9 +121,47 @@ func AddChunkJob(job chunkJob) error {
 //  5. Handle errors or retries.
 //
 // Right now it’s a no-op stub that just prints the intended path.
-func writeChunkAt(job chunkJob) {
+
+// improvements I need to make
+// pass a channel error channel
+// if there is an error put it to that channel
+func writeChunkAt(job *chunkJob, errChannel chan<- *chunkJob) {
+	// get the filepath to the temporary chunk download
 	filePath := fmt.Sprintf("%s/%s_chunk_%d.bin",
 		job.parentPath, job.uploadID, job.chunkNO)
-	// TODO: replace with real filesystem write logic.
-	fmt.Printf("Writing chunk to %q (size=%d bytes)\n", filePath, len(job.data))
+
+	// open a connection to the filePath
+	f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		logger.ErrorLogger.Println(err)
+		// need to add more error specific to the chunk job
+		errChannel <- job
+		return
+	}
+	// defer close the connection
+	defer f.Close()
+	// write to that connection
+	_, err = f.Write(job.data)
+
+	if err != nil {
+		logger.ErrorLogger.Println(err)
+		// need to add more error specific to the chunk job
+		errChannel <- job
+		return
+	}
+
+	logger.InfoLogger.Println(fmt.Sprintf("%s was succesfully writen ", job.println()))
+
 }
+
+// func writeChunkAt(path string, data []byte, _ int64) error {
+// 	// Create or truncate the part file so it starts empty
+// 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer f.Close()
+// 	// Simply write the chunk; its file size will == len(data)
+// 	_, err = f.Write(data)
+// 	return err
+// }
