@@ -6,7 +6,7 @@ import (
 	user_errors "docTrack/errors/user"
 	logger "docTrack/logger"
 	folder_model "docTrack/models/folders"
-	os_inhouse "docTrack/os"
+	os_inhouse "docTrack/os_inhouse"
 	user_service "docTrack/services/user"
 	"errors"
 	"fmt"
