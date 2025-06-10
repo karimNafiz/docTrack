@@ -32,6 +32,15 @@ func (job *chunkJob) String() string {
 	return fmt.Sprintf("chunkJob(upload=%s, chunk=%d)", job.uploadID, job.chunkNO)
 }
 
+// need to get the chunk file name
+// so there would be a base directory like tempUploadDir
+// then in there there would be folders named according to the uploadIDS
+// inside that folder we will have chunk files name chunk_chunkNO
+// I might need this now im jus gonna use the String method
+// func (job *chunkJob) getChunkFileName() string {
+// 	return fmt.Sprintf("chunkNO")
+// }
+
 func CreateChunkJob(uploadID string, chunkNO uint, baseDirectoryPath string, data []byte) *chunkJob {
 	// create the parentPath
 	parentPath := filepath.Join(baseDirectoryPath, uploadID)
@@ -147,6 +156,9 @@ func AddChunkJob(job *chunkJob) error {
 	if bufferedChunkJobChannelInstance == nil {
 		return fmt.Errorf("chunk job channel not initialized; call InstantiateBufferedChunkJobChannel first")
 	}
+
+	logger.InfoLogger.Println("Added Chunk Job " + job.String())
+
 	bufferedChunkJobChannelInstance.jobs <- job
 	return nil
 }
@@ -158,9 +170,12 @@ func AddChunkJob(job *chunkJob) error {
 // writeChunkAt attempts to write the chunk to disk. On error, it sends the job
 // into the provided errChannel for separate handling.
 func writeChunkAt(job *chunkJob, errChannel chan<- *chunkJob) {
-	filePath := fmt.Sprintf("%s/%s_chunk_%d.bin", job.parentPath, job.uploadID, job.chunkNO)
+	// so the filePath would be tempUploadDir/uploadID(chunkJob)/chunkJob.String() whatever string returns
+	filePath := filepath.Join(job.parentPath, job.String())
 
 	// Ensure parent directory exists, creating any missing folders.
+	// TODO: maybe optimize this step,
+	// if all the folders exist, doesnt return any error
 	if err := os.MkdirAll(job.parentPath, 0755); err != nil {
 		// Log and push the failed job onto jobErrors
 		logger.ErrorLogger.Printf("[%s] mkdir error: %v", job.String(), err)

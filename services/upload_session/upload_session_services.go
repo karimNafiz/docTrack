@@ -21,7 +21,8 @@ import (
 	folder_errors "docTrack/errors/folder"
 	folder_service "docTrack/services/folder"
 
-	os_inhouse "docTrack/os"
+	os_inhouse "docTrack/os_inhouse"
+	os_inhouse_chunkjob "docTrack/os_inhouse/chunk_job"
 )
 
 const tempUploadDir = "temp_uploads"
@@ -120,19 +121,23 @@ func WriteChunkAt(uploadID string, chunkNo int, data []byte) error {
 
 	err := db.DB.Where("id = ?", uploadID).First(&uploadSession).Error
 	if err != nil {
+		logger.ErrorLogger.Println(err)
 		return err
 	}
 
 	if chunkNo >= uploadSession.TotalChunks || chunkNo < 0 {
-		return errors.New(" no of chunks have exceeded the total no of chunks ")
+		err := errors.New(" no of chunks have exceeded the total no of chunks ")
+		logger.ErrorLogger.Println(err)
+		return err
 	}
 
 	if len(data) > uploadSession.ChunkSize {
-		return errors.New(" the chunk size exceeds the pre-defined chunk size ")
+		err := errors.New(" the chunk size exceeds the pre-defined chunk size ")
+		logger.ErrorLogger.Println(err)
+		return err
 	}
-	partPath := filepath.Join(filepath.Join(tempUploadDir, uploadSession.ID), fmt.Sprintf("%06d.part", chunkNo))
-	fmt.Println("writing chunk at path " + partPath + " \n from function WriteChunkAt")
-	err = writeChunkAt(partPath, data, int64(uploadSession.ChunkSize)*int64(chunkNo))
+
+	err = os_inhouse_chunkjob.AddChunkJob(os_inhouse_chunkjob.CreateChunkJob(uploadID, uint(chunkNo), tempUploadDir, data))
 	return err
 
 }
