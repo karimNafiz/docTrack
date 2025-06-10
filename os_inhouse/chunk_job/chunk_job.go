@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	logger "docTrack/logger"
@@ -29,6 +30,18 @@ type chunkJob struct {
 // String returns a concise description of the chunkJob for logging.
 func (job *chunkJob) String() string {
 	return fmt.Sprintf("chunkJob(upload=%s, chunk=%d)", job.uploadID, job.chunkNO)
+}
+
+func CreateChunkJob(uploadID string, chunkNO uint, baseDirectoryPath string, data []byte) *chunkJob {
+	// create the parentPath
+	parentPath := filepath.Join(baseDirectoryPath, uploadID)
+	return &chunkJob{
+		uploadID:   uploadID,
+		chunkNO:    chunkNO,
+		parentPath: parentPath,
+		data:       data,
+	}
+
 }
 
 // -----------------------------------------------------------------------------
@@ -187,3 +200,5 @@ func handleFailedJob(job *chunkJob) {
 	// TODO: implement retry policies, metrics, or DB updates
 	logger.ErrorLogger.Printf("handling failed job: %s", job.String())
 }
+
+// need the function create chunk job
