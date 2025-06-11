@@ -124,35 +124,39 @@ func WriteChunkAt(uploadID string, chunkNo int, data []byte) error {
 		logger.ErrorLogger.Println(err)
 		return err
 	}
+	// redundant check
+	// if chunkNo >= uploadSession.TotalChunks || chunkNo < 0 {
+	// 	err := errors.New(" no of chunks have exceeded the total no of chunks ")
+	// 	logger.ErrorLogger.Println(err)
+	// 	return err
+	// }
 
-	if chunkNo >= uploadSession.TotalChunks || chunkNo < 0 {
-		err := errors.New(" no of chunks have exceeded the total no of chunks ")
-		logger.ErrorLogger.Println(err)
-		return err
-	}
-
-	if len(data) > uploadSession.ChunkSize {
+	// check if the data recieved is the expected size
+	if len(data) != uploadSession.ChunkSize {
 		err := errors.New(" the chunk size exceeds the pre-defined chunk size ")
 		logger.ErrorLogger.Println(err)
 		return err
 	}
 
+	// if everything is fine we try to add a chunk job to our go-routine pool
 	err = os_inhouse_chunkjob.AddChunkJob(os_inhouse_chunkjob.CreateChunkJob(uploadID, uint(chunkNo), tempUploadDir, data))
 	return err
 
 }
 
-func writeChunkAt(path string, data []byte, _ int64) error {
-	// Create or truncate the part file so it starts empty
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	// Simply write the chunk; its file size will == len(data)
-	_, err = f.Write(data)
-	return err
-}
+// redundant function
+
+// func writeChunkAt(path string, data []byte, _ int64) error {
+// 	// Create or truncate the part file so it starts empty
+// 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer f.Close()
+// 	// Simply write the chunk; its file size will == len(data)
+// 	_, err = f.Write(data)
+// 	return err
+// }
 
 func UploadSessionFinalConfirmation(uploadID string) error {
 
