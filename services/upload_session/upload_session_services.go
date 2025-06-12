@@ -140,7 +140,14 @@ func WriteChunkAt(uploadID string, chunkNo int, data []byte) error {
 
 	// if everything is fine we try to add a chunk job to our go-routine pool
 	err = os_inhouse_chunkjob.AddChunkJob(os_inhouse_chunkjob.CreateChunkJob(uploadID, uint(chunkNo), tempUploadDir, data))
-	return err
+
+	if err != nil {
+		logger.ErrorLogger.Println(err)
+		return err
+	}
+
+	// if there is no error
+	// i should put the upload session to PROGRESS if its it not
 
 }
 
