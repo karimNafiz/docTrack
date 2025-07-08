@@ -11,6 +11,8 @@ type File struct {
 	ParentID               uint      `gorm:"index;column:parent_id"`
 	Name                   string    `gorm:"not null;column:name"`
 	Slug                   string    `gorm:"not null;column:slug"`
+	Size                   uint      `gorm:"not null;size"`
+	Extension              string    `gorm:"not null;column:extension"`
 	ParentMaterializedPath string    `gorm:"not null;column:parent_materialized_path"`
 	Depth                  uint      `gorm:"not null;column:depth"`
 	CreatedAt              time.Time `gorm:"autoCreateTime;not null;column:created_at"`
