@@ -10,6 +10,7 @@ import (
 	user_service "docTrack/services/user"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -40,9 +41,8 @@ func CreateFolder(flderName string, ownerID uint, parentID uint) (*folder_model.
 		folderName = fmt.Sprintf("%s_%d", flderName, count)
 	}
 
-	// TODO: remove this later
-	// need to check if users exists or not
-	// this is temporary code, remove this later
+	// TODO the use checking will be done long before
+	// the code even reaches this point
 	_, err := user_service.FindUserByID(ownerID)
 	if err != nil {
 		logger.ErrorLogger.Println(err)
@@ -163,7 +163,51 @@ func copyFolderRecursive(originalFolderPath string, parentFolderPtr *folder_mode
 	return nil
 }
 
-func copyFile() {}
+// how should the copyFile function work
+// get the path to the original file
+// get the path to the destination
+// open connections to both the paths
+// try to check if already a file with the same name exists or not
+// if so do the technique I have done before
+// just copy
+func copyFile(originalFilePath string, destinationPath string, filename string) error {
+	// try to open a connection to the originalFilePath
+	srcFile, err := os.Open(originalFilePath)
+
+	// if there is an error
+	// we need to return the error
+	if err != nil {
+		logger.ErrorLogger.Println(err)
+		return err
+	}
+	// at this point we have opened a connection to our file
+	// make sure we have this
+	// or else memory will leaked
+	defer srcFile.Close()
+
+	dstFilePath := filepath.Join(destinationPath, filename)
+	dstFile, err := os.Create(dstFilePath)
+	if err != nil {
+		logger.ErrorLogger.Println(err)
+		return err
+	}
+	// at this point we have an open connection to the destination file path
+	defer dstFile.Close()
+
+	// copy everything
+	_, err = io.Copy(dstFile, srcFile)
+
+	// TODO: make sure dat all the bytes are copied
+	// open up os.Stats for the srcFile
+	if err != nil {
+		logger.ErrorLogger.Println(err)
+		// TODO need to delete the destination file created
+		os.Remove(dstFilePath)
+		return err
+	}
+	return nil
+
+}
 
 // need a function for updating the folder
 // right now the only thing I can think of updating is the name

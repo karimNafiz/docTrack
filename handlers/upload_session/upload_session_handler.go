@@ -25,7 +25,7 @@ func InitUploadSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Create session
-	session, err := upload_session_service.InitUploadSession(req.Filename, req.FileSize)
+	session, err := upload_session_service.InitUploadSession(req.Filename, 0, 0, req.FileSize)
 	if err != nil {
 		http.Error(w, "Could not initiate upload", http.StatusInternalServerError)
 		return

@@ -36,6 +36,9 @@ const uploadFileExt = ".part"
 //
 // It runs the database creation and file system operations in parallel,
 // waits for both to finish, and performs rollback on partial failure.
+// this design is depricated im moving everything related to uploading of files to different micro service
+// i need to use that micro service
+// depricatedFunction
 func InitUploadSession(filename string, userID uint, parentID uint, fileSize int64) (*upload_session_model.UploadSession, error) {
 	logger.InfoLogger.Printf("started upload session for file %s ", filename)
 
@@ -111,6 +114,17 @@ func InitUploadSession(filename string, userID uint, parentID uint, fileSize int
 	// Step 7: Return the initialized upload session (both tasks succeeded)
 	return &uploadSession, nil
 }
+
+// needs to take the port and address of the file uploaded microservice
+// for the microservice
+// ill use it as a package
+// you can download this package
+// im not sure about the design right now
+// ill jus use the micro service architecture
+// need to store every in a config file
+func InitUploadSession_new() {}
+
+func initUploadSession(domain string, port string)
 
 //TODO need to delete the upload session if there are any errors
 // need to add a column to the
