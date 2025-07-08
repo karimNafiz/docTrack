@@ -138,8 +138,10 @@ func copyFolderRecursive(originalFolderPath string, parentFolderPtr *folder_mode
 		// we just duplicate the File
 		// set its parent to the parentFolderPtr passed into this function
 		if !entry.IsDir() {
-			// start copying the files
-			// create file entries on the data base
+			srcFilename := entry.Name()
+			srcFilePath := filepath.Join(originalFolderPath, srcFilename)
+			dstFolderPath := getFolderMaterializedPath(parentFolderPtr)
+			copyFile(srcFilePath, dstFolderPath, srcFilename)
 		}
 
 		// if its a folder
