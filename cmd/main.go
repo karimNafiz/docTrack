@@ -31,3 +31,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", cors(router)))
 
 }
+
+
+// need a function to subscribe file upload service
+// we will get a service id back

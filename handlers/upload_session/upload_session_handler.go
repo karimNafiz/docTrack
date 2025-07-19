@@ -51,6 +51,7 @@ func InitUploadSession(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// / Depricated
 func UplodaChunk(w http.ResponseWriter, r *http.Request) {
 
 	// important
@@ -90,10 +91,10 @@ func UplodaChunk(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// / need to repurpose this function
 func CompleteUploadSession(w http.ResponseWriter, r *http.Request) {
-	// need to notify go that the tcp connection can be re-used
-	// or else if all the data is not read from the network stream
-	// the tcp connection will stay open untill the garbage collector collects it
+
+	// need to check if the request is from the file upload micro-service
 	defer r.Body.Close()
 
 	// need the uploadID

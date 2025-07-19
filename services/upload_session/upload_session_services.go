@@ -122,7 +122,17 @@ func InitUploadSession(filename string, userID uint, parentID uint, fileSize int
 // im not sure about the design right now
 // ill jus use the micro service architecture
 // need to store every in a config file
-func InitUploadSession_new() {}
+func InitUploadSession_new(fusInfo map[string]string, userID uint, parentID uint, filename string, filesize int64) {
+	// check if the parenID is valid or not
+	// this is prototyping, no need to check if the parent exists or not
+	// i need to generate an uploadID
+	// need to send the filename for the filename need to produce a slug
+	// need the final path
+	// need the chunk size
+	// need total chunks
+	// need the service
+
+}
 
 func initUploadSession(domain string, port string)
 
