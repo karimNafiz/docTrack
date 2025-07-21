@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	DB "docTrack/config"
+	"docTrack/file_upload_service"
+	"docTrack/global_configs"
 	logger "docTrack/logger"
 	routes "docTrack/routes"
+
 	"log"
 	"net/http"
 
@@ -17,8 +21,12 @@ func main() {
 	if err := DB.InitDB(dsn); err != nil {
 		log.Fatal("failed to connect to database ", err)
 	}
-
-	router := routes.SetupRouter()
+	fUploadData, err := connectToFileUploadService(context.Background())
+	if err != nil {
+		log.Fatal("failed to connect to file upload ", err)
+		return
+	}
+	router := routes.SetupRouter(fUploadData)
 
 	cors := handlers.CORS(
 		handlers.AllowedOrigins([]string{"http://localhost:3000"}), // your UI origin
@@ -32,6 +40,25 @@ func main() {
 
 }
 
+func connectToFileUploadService(pContext context.Context) (*file_upload_service.FileUploadServiceInfo, error) {
+	header := map[string]string{
+		"Content-Type": "application/json",
+	}
+	payload := struct {
+		Host                    string `json:"host"`
+		Scheme                  string `json:"scheme"`
+		Port                    string `json:"port"`
+		UploadStatusCallBackUrl string `json:"uploadStatusCallBackUrl"`
+	}{
+		Host:                    global_configs.MAINSERVICEDOMAIN,
+		Scheme:                  global_configs.MAINSERVICESCHEME,
+		Port:                    global_configs.MAINSERVICEPORT,
+		UploadStatusCallBackUrl: global_configs.FILEUPLOADSERVICECALLBACKURL,
+	}
+	fUploadSerData, err := file_upload_service.RegisterToFileUploadService(pContext, global_configs.FILEUPLOADSERVICESCHEME, global_configs.FILEUPLOADSERVICEDOMAIN, global_configs.FILEUPLOADSERVICEPORT, global_configs.FILEUPLOADSERVICEREGISTERENDPOINT, header, payload)
+
+	return fUploadSerData, err
+}
 
 // need a function to subscribe file upload service
 // we will get a service id back

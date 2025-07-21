@@ -122,14 +122,25 @@ func InitUploadSession(filename string, userID uint, parentID uint, fileSize int
 // im not sure about the design right now
 // ill jus use the micro service architecture
 // need to store every in a config file
-func InitUploadSession_new(fusInfo map[string]string, userID uint, parentID uint, filename string, filesize int64) {
+// fusInfo - stores meta data for the file upload service
+func InitUploadSession_new(fusInfo map[string]string, userID uint, parentID uint, filename string, fileSize int64, chunkSize int) (map[string]string, error) {
 	// check if the parenID is valid or not
 	// this is prototyping, no need to check if the parent exists or not
 	// i need to generate an uploadID
-	// need to send the filename for the filename need to produce a slug
+	uploadID := utils.GenerateUploadID()
+	// need to send the filename for the filename need to produce a slug not doing it right now
+	parentPtr, err := folder_service.GetFolderByID(parentID)
+	if err != nil {
+		logger.ErrorLogger.Println("parent folder not found, parentID : ", parentID) // temporary code
+		return nil, err
+	}
 	// need the final path
+	// TODO: -
+	// consider making this function part of the folder struct
+	finalPath := folder_service.GetFolderMaterializedPath(parentPtr)
 	// need the chunk size
 	// need total chunks
+	totalChunks := int((fileSize + int64(chunkSize-1)) / int64(chunkSize))
 	// need the service
 
 }

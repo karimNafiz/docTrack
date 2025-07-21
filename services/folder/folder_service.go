@@ -58,7 +58,7 @@ func CreateFolder(flderName string, ownerID uint, parentID uint) (*folder_model.
 		return nil, err
 	}
 	slug := getSlugFrmFolderName(folderName)
-	parentFolderPath := getFolderMaterializedPath(parentFolderPtr)
+	parentFolderPath := GetFolderMaterializedPath(parentFolderPtr)
 	err = os_inhouse.CreateFolder(parentFolderPath, slug)
 
 	if err != nil {
@@ -116,7 +116,7 @@ func CopyFolder(folderID uint, ownerID uint, dstFolderID uint) error {
 	}
 	// get the path to the Original Folder in the server
 	// because we need to duplicate it's content
-	originalFolderPath := getFolderMaterializedPath(originalFolderStructPtr)
+	originalFolderPath := GetFolderMaterializedPath(originalFolderStructPtr)
 
 	// in the copyFolderRecursive function we need to pass the path to the original folder in the server
 	// then as parent we need to pass the ptr to duplicateFolderStruct
@@ -140,7 +140,7 @@ func copyFolderRecursive(originalFolderPath string, parentFolderPtr *folder_mode
 		if !entry.IsDir() {
 			srcFilename := entry.Name()
 			srcFilePath := filepath.Join(originalFolderPath, srcFilename)
-			dstFolderPath := getFolderMaterializedPath(parentFolderPtr)
+			dstFolderPath := GetFolderMaterializedPath(parentFolderPtr)
 			copyFile(srcFilePath, dstFolderPath, srcFilename)
 		}
 
@@ -226,7 +226,7 @@ func GetFolderByID(folderID uint) (*folder_model.Folder, error) {
 // 	return filepath.Join(parentFolderPtr.ParentMaterializedPath, parentFolderPtr.Slug)
 // }
 
-func getFolderMaterializedPath(folder *folder_model.Folder) string {
+func GetFolderMaterializedPath(folder *folder_model.Folder) string {
 	return filepath.Join(folder.ParentMaterializedPath, folder.Slug)
 }
 

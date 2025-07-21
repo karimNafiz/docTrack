@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -200,4 +201,8 @@ func Copy(reader io.Reader, writer io.Writer) (int64, error) { // in the future,
 	}
 
 	return totalWritten, nil
+}
+
+func GenerateUploadID() string {
+	return uuid.New().String()
 }
