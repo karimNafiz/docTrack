@@ -1,57 +1,58 @@
 package upload_session
 
 import (
+	p_file_upload_service "docTrack/file_upload_service"
 	upload_session_service "docTrack/services/upload_session"
 	"encoding/json"
-	"io"
 	"net/http"
-	"strconv"
-
-	"github.com/gorilla/mux"
 )
 
-func InitUploadSession(w http.ResponseWriter, r *http.Request) {
-	// Close the body when we’re done
-	defer r.Body.Close()
+func GetInitUploadSessionHandler(fUploadData *p_file_upload_service.FileUploadServiceInfo) http.HandlerFunc {
 
-	// 1. Decode request
-	var req struct {
-		Filename string `json:"filename"`
-		FileSize int64  `json:"fileSize"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
-		return
-	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Close the body when we’re done
+		defer r.Body.Close()
 
-	// 2. Create session
-	session, err := upload_session_service.InitUploadSession(req.Filename, 0, 0, req.FileSize)
-	if err != nil {
-		http.Error(w, "Could not initiate upload", http.StatusInternalServerError)
-		return
-	}
+		// 1. Decode request
+		var req struct {
+			Filename string `json:"filename"`
+			FileSize int64  `json:"fileSize"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+			return
+		}
 
-	// 3. Build response
-	resp := struct {
-		UploadID    string `json:"uploadID"`
-		ChunkSize   int64  `json:"chunkSize"`
-		TotalChunks int    `json:"totalChunks"`
-	}{
-		UploadID:    session.ID,
-		ChunkSize:   int64(session.ChunkSize),
-		TotalChunks: session.TotalChunks,
-	}
+		// 2. Create session
+		session, err := upload_session_service.InitUploadSession(req.Filename, 0, 0, req.FileSize)
+		if err != nil {
+			http.Error(w, "Could not initiate upload", http.StatusInternalServerError)
+			return
+		}
 
-	// 4. Send JSON
-	w.Header().Set("Content-Type", "application/json")
-	// (Optional) w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(&resp); err != nil {
-		http.Error(w, "Failed to write response", http.StatusInternalServerError)
-	}
+		// 3. Build response
+		resp := struct {
+			UploadID    string `json:"uploadID"`
+			ChunkSize   int64  `json:"chunkSize"`
+			TotalChunks int    `json:"totalChunks"`
+		}{
+			UploadID:    session.ID,
+			ChunkSize:   int64(session.ChunkSize),
+			TotalChunks: session.TotalChunks,
+		}
 
+		// 4. Send JSON
+		w.Header().Set("Content-Type", "application/json")
+		// (Optional) w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(&resp); err != nil {
+			http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		}
+
+	}
 }
 
-// / Depricated
+/*
+!!! Depricated
 func UplodaChunk(w http.ResponseWriter, r *http.Request) {
 
 	// important
@@ -117,3 +118,4 @@ func CompleteUploadSession(w http.ResponseWriter, r *http.Request) {
 	})
 
 }
+*/
