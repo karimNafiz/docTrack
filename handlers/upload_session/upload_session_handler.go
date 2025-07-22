@@ -1,13 +1,14 @@
 package upload_session
 
 import (
-	p_file_upload_service "docTrack/file_upload_service"
-	upload_session_service "docTrack/services/upload_session"
+	pfileUploadService "docTrack/file_upload_service"
+	pglobalConfigs "docTrack/global_configs"
+	p_uploadSessionService "docTrack/services/upload_session"
 	"encoding/json"
 	"net/http"
 )
 
-func GetInitUploadSessionHandler(fUploadData *p_file_upload_service.FileUploadServiceInfo) http.HandlerFunc {
+func GetInitUploadSessionHandler(fUploadData *pfileUploadService.FileUploadServiceInfo) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Close the body when we’re done
@@ -16,7 +17,7 @@ func GetInitUploadSessionHandler(fUploadData *p_file_upload_service.FileUploadSe
 		// 1. Decode request
 		var req struct {
 			Filename string `json:"filename"`
-			FileSize int64  `json:"fileSize"`
+			FileSize uint   `json:"fileSize"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid JSON body", http.StatusBadRequest)
@@ -24,27 +25,16 @@ func GetInitUploadSessionHandler(fUploadData *p_file_upload_service.FileUploadSe
 		}
 
 		// 2. Create session
-		session, err := upload_session_service.InitUploadSession(req.Filename, 0, 0, req.FileSize)
+		response, err := p_uploadSessionService.InitUploadSessionService(fUploadData, 0, 0, req.Filename, req.FileSize, pglobalConfigs.CHUNKSIZE)
 		if err != nil {
 			http.Error(w, "Could not initiate upload", http.StatusInternalServerError)
 			return
 		}
 
-		// 3. Build response
-		resp := struct {
-			UploadID    string `json:"uploadID"`
-			ChunkSize   int64  `json:"chunkSize"`
-			TotalChunks int    `json:"totalChunks"`
-		}{
-			UploadID:    session.ID,
-			ChunkSize:   int64(session.ChunkSize),
-			TotalChunks: session.TotalChunks,
-		}
-
 		// 4. Send JSON
 		w.Header().Set("Content-Type", "application/json")
 		// (Optional) w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(&resp); err != nil {
+		if err := json.NewEncoder(w).Encode(response); err != nil {
 			http.Error(w, "Failed to write response", http.StatusInternalServerError)
 		}
 
@@ -83,7 +73,7 @@ func UplodaChunk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = upload_session_service.WriteChunkAt(uploadID, idx, data)
+	err = puploadSessionService.WriteChunkAt(uploadID, idx, data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -108,7 +98,7 @@ func CompleteUploadSession(w http.ResponseWriter, r *http.Request) {
 	// right now im going to set a single status code for any errors
 	// but i should distinguish between server errors- 500 and unprocessableEntity- 422
 
-	if err := upload_session_service.UploadSessionFinalConfirmation(uploadID); err != nil {
+	if err := puploadSessionService.UploadSessionFinalConfirmation(uploadID); err != nil {
 		http.Error(w, "unprocessable entity ", http.StatusUnprocessableEntity)
 	}
 
