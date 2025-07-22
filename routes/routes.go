@@ -13,10 +13,10 @@ func SetupRouter(fUploadData *file_upload_service.FileUploadServiceInfo) *mux.Ro
 	// create the parent router
 	router := mux.NewRouter()
 	// create upload sub-router
-	upload := router.PathPrefix("/upload").Subrouter()
+	//upload := router.PathPrefix("/upload").Subrouter()
 	// decide later if the http verb should be post or get
-	upload.HandleFunc("/", upload_session_handler.InitUploadSession).Methods("POST", "OPTIONS")
-	upload.HandleFunc("", upload_session_handler.InitUploadSession).Methods("POST", "OPTIONS")
+	//upload.HandleFunc("/", upload_session_handler.InitUploadSession).Methods("POST", "OPTIONS")
+	//upload.HandleFunc("", upload_session_handler.InitUploadSession).Methods("POST", "OPTIONS")
 
 	// right now these aren't being used
 	router.HandleFunc("/register", user_handler.RegisterHandler).Methods("POST")

@@ -3,9 +3,11 @@ package file_upload_service
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -22,7 +24,7 @@ func RegisterToFileUploadService(ctx context.Context, scheme string, domain stri
 	defer cancel()
 	body, err := json.Marshal(payload)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return nil, err
 	}
 	// need to build the url
@@ -31,7 +33,7 @@ func RegisterToFileUploadService(ctx context.Context, scheme string, domain stri
 	// need to create a http.Request using the payload
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return nil, err
 	}
 	// set the headers
@@ -43,13 +45,17 @@ func RegisterToFileUploadService(ctx context.Context, scheme string, domain stri
 		TLSHandshakeTimeout: 5 * time.Second,
 		MaxIdleConns:        1,
 		IdleConnTimeout:     0 * time.Second,
+		TLSClientConfig: &tls.Config{
+			// this is set to true solely for testing
+			InsecureSkipVerify: true,
+		},
 	}
 	client := http.Client{
 		Transport: transport,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return nil, err
 	}
 	// good go-lang practise

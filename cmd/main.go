@@ -7,6 +7,7 @@ import (
 	"docTrack/global_configs"
 	logger "docTrack/logger"
 	routes "docTrack/routes"
+	"fmt"
 
 	"log"
 	"net/http"
@@ -26,6 +27,7 @@ func main() {
 		log.Fatal("failed to connect to file upload ", err)
 		return
 	}
+	fmt.Println("connected to the file upload service ")
 	router := routes.SetupRouter(fUploadData)
 
 	cors := handlers.CORS(
@@ -48,7 +50,7 @@ func connectToFileUploadService(pContext context.Context) (*file_upload_service.
 		Host                    string `json:"host"`
 		Scheme                  string `json:"scheme"`
 		Port                    string `json:"port"`
-		UploadStatusCallBackUrl string `json:"uploadStatusCallBackUrl"`
+		UploadStatusCallBackUrl string `json:"upload_status_callback_url"`
 	}{
 		Host:                    global_configs.MAINSERVICEDOMAIN,
 		Scheme:                  global_configs.MAINSERVICESCHEME,

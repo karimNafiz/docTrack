@@ -1,11 +1,16 @@
 package utils
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -205,4 +210,37 @@ func Copy(reader io.Reader, writer io.Writer) (int64, error) { // in the future,
 
 func GenerateUploadID() string {
 	return uuid.New().String()
+}
+
+func SendHttpRequest(pCtx context.Context, method string, url string, headers map[string]string, body io.Reader) (*http.Response, error) {
+	ctx, cancel := context.WithTimeout(pCtx, time.Second*10)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		log.Println("error creating http request: err -> ", err.Error())
+		return nil, err
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+	transport := &http.Transport{
+		TLSHandshakeTimeout: time.Second * 5,
+		DisableKeepAlives:   true,
+	}
+	client := http.Client{
+		Transport: transport,
+		Timeout:   time.Second * 10,
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("error creating http request: err -> ", err.Error())
+		return nil, err
+	}
+	respBytes, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		log.Println("error reading the http response err ->", err.Error())
+	}
+	resp.Body = io.NopCloser(bytes.NewBuffer(respBytes))
+	return resp, nil
 }

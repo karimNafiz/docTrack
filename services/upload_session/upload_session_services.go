@@ -3,26 +3,26 @@ package upload_session
 import (
 	db "docTrack/config"
 	upload_session_model "docTrack/models/upload_sessions"
-	"errors"
-	"fmt"
+	//"errors"
+	//"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
+	//"strconv"
+	//"strings"
 	"sync"
 
-	utils "docTrack/utils"
+	//utils "docTrack/utils"
 
 	"github.com/google/uuid"
 
 	logger "docTrack/logger"
-	pdf_service "docTrack/services/pdf"
+	//pdf_service "docTrack/services/pdf"
 
 	folder_errors "docTrack/errors/folder"
 	folder_service "docTrack/services/folder"
 
 	os_inhouse "docTrack/os_inhouse"
-	os_inhouse_chunkjob "docTrack/os_inhouse/chunk_job"
+	//os_inhouse_chunkjob "docTrack/os_inhouse/chunk_job"
 )
 
 const tempUploadDir = "temp_uploads"
@@ -76,7 +76,7 @@ func InitUploadSession(filename string, userID uint, parentID uint, fileSize int
 	// Step 3: Spawn a goroutine to create the upload session in the database.
 	go func() {
 		defer wg.Done() // Mark this task as done when the goroutine finishes
-		dbErr = createUploadSessionRecord(&uploadSession)
+		//dbErr = createUploadSessionRecord(&uploadSession)
 	}()
 
 	// Step 4: Spawn a goroutine to create the temporary upload directory on disk.
@@ -123,30 +123,30 @@ func InitUploadSession(filename string, userID uint, parentID uint, fileSize int
 // ill jus use the micro service architecture
 // need to store every in a config file
 // fusInfo - stores meta data for the file upload service
-func InitUploadSession_new(fusInfo map[string]string, userID uint, parentID uint, filename string, fileSize int64, chunkSize int) (map[string]string, error) {
-	// check if the parenID is valid or not
-	// this is prototyping, no need to check if the parent exists or not
-	// i need to generate an uploadID
-	uploadID := utils.GenerateUploadID()
-	// need to send the filename for the filename need to produce a slug not doing it right now
-	parentPtr, err := folder_service.GetFolderByID(parentID)
-	if err != nil {
-		logger.ErrorLogger.Println("parent folder not found, parentID : ", parentID) // temporary code
-		return nil, err
-	}
-	// need the final path
-	// TODO: -
-	// consider making this function part of the folder struct
-	finalPath := folder_service.GetFolderMaterializedPath(parentPtr)
-	// need the chunk size
-	// need total chunks
-	totalChunks := int((fileSize + int64(chunkSize-1)) / int64(chunkSize))
-	// need the service
-
-}
-
-func initUploadSession(domain string, port string)
-
+//func InitUploadSession_new(fusInfo map[string]string, userID uint, parentID uint, filename string, fileSize int64, chunkSize int) (map[string]string, error) {
+//	// check if the parenID is valid or not
+//	// this is prototyping, no need to check if the parent exists or not
+//	// i need to generate an uploadID
+//	uploadID := utils.GenerateUploadID()
+//	// need to send the filename for the filename need to produce a slug not doing it right now
+//	parentPtr, err := folder_service.GetFolderByID(parentID)
+//	if err != nil {
+//		logger.ErrorLogger.Println("parent folder not found, parentID : ", parentID) // temporary code
+//		return nil, err
+//	}
+//	// need the final path
+//	// TODO: -
+//	// consider making this function part of the folder struct
+//	finalPath := folder_service.GetFolderMaterializedPath(parentPtr)
+//	// need the chunk size
+//	// need total chunks
+//	totalChunks := int((fileSize + int64(chunkSize-1)) / int64(chunkSize))
+//	// need the service
+//
+//}
+//
+//func initUploadSession(domain string, port string)
+/*
 //TODO need to delete the upload session if there are any errors
 // need to add a column to the
 
@@ -180,25 +180,11 @@ func WriteChunkAt(uploadID string, chunkNo int, data []byte) error {
 		logger.ErrorLogger.Println(err)
 		return err
 	}
-
+	return nil
 	// if there is no error
 	// i should put the upload session to PROGRESS if its it not
 
 }
-
-// redundant function
-
-// func writeChunkAt(path string, data []byte, _ int64) error {
-// 	// Create or truncate the part file so it starts empty
-// 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer f.Close()
-// 	// Simply write the chunk; its file size will == len(data)
-// 	_, err = f.Write(data)
-// 	return err
-// }
 
 func UploadSessionFinalConfirmation(uploadID string) error {
 
@@ -364,3 +350,4 @@ func createUploadSessionRecord(session *upload_session_model.UploadSession) erro
 	}
 	return nil
 }
+*/
