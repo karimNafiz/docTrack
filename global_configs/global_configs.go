@@ -16,7 +16,7 @@ const MAINSERVICEDOMAIN = "localhost"
 const MAINSERVICESCHEME = "http"
 
 func GetFolderServiceRootUrlHttp() string {
-	return fmt.Sprintf("%s://%s:%s", "http", FILEUPLOADSERVICEDOMAIN, "9000")
+	return fmt.Sprintf("%s://%s:%s", "http", FILEUPLOADSERVICEDOMAIN, "8000")
 }
 func GetFolderServiceRootUrlHttps() string {
 	return fmt.Sprintf("%s://%s:%s", "https", FILEUPLOADSERVICEDOMAIN, "8443")

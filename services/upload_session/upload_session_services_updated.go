@@ -12,7 +12,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"path/filepath"
 )
 
 func InitUploadSessionService(fData *p_file_upload_service.FileUploadServiceInfo, userID uint, parentID uint, filename string, filesize uint, chunkSize uint) (json.Marshaler, error) {
@@ -39,13 +38,15 @@ func InitUploadSessionService(fData *p_file_upload_service.FileUploadServiceInfo
 		ServiceID:   fData.ServiceID,
 	}
 	payload, err := reqBody.MarshalJSON()
-	url := filepath.Join(pGlobalConfigs.GetFolderServiceRootUrlHttp(), pGlobalConfigs.FILEUPLOADSERVICEINITUPLOADSESSION)
+	//url := filepath.Join(pGlobalConfigs.GetFolderServiceRootUrlHttp(), pGlobalConfigs.FILEUPLOADSERVICEINITUPLOADSESSION)
+	url := fmt.Sprintf("%s%s", pGlobalConfigs.GetFolderServiceRootUrlHttp(), pGlobalConfigs.FILEUPLOADSERVICEINITUPLOADSESSION)
 	headers := map[string]string{
 		"Content-Type": "application/json",
 	}
 	response, err := pUtils.SendHttpRequest(context.Background(), http.MethodPost, url, headers, bytes.NewBuffer(payload))
 	if err != nil {
 		log.Println("error with sending http request err -> ", err.Error())
+		return nil, err
 	}
 	// looks fancy nothing else
 	defer func(Body io.ReadCloser) {

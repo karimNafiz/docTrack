@@ -12,7 +12,9 @@ type InitUploadSessionClientResponse struct {
 }
 
 func (u InitUploadSessionClientResponse) MarshalJSON() ([]byte, error) {
-	return json.Marshal(u)
+	// learned my lesson through infinite recursion xD
+	type alias InitUploadSessionClientResponse
+	return json.Marshal(alias(u))
 }
 
 type FUploadServiceHttpRequestBody struct {
@@ -25,5 +27,6 @@ type FUploadServiceHttpRequestBody struct {
 }
 
 func (f FUploadServiceHttpRequestBody) MarshalJSON() ([]byte, error) {
-	return json.Marshal(f)
+	type alias FUploadServiceHttpRequestBody
+	return json.Marshal(alias(f))
 }

@@ -24,7 +24,7 @@ func SetupRouter(fUploadData *file_upload_service.FileUploadServiceInfo) *mux.Ro
 
 	router.HandleFunc("/folder", folder_handler.CreateFolderHandler).Methods("POST")
 
-	router.HandleFunc("/upload", upload_session_handler.InitUploadSession).Methods("POST", "OPTIONS")
+	router.HandleFunc("/upload", upload_session_handler.GetInitUploadSessionHandler(fUploadData)).Methods("POST", "OPTIONS")
 
 	//// we need a router for /upload/{uploadID}/chunk?index = smth
 	//// we need to use regex

@@ -17,7 +17,7 @@ func GetInitUploadSessionHandler(fUploadData *pfileUploadService.FileUploadServi
 		// 1. Decode request
 		var req struct {
 			Filename string `json:"filename"`
-			FileSize uint   `json:"fileSize"`
+			FileSize uint   `json:"file_size"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid JSON body", http.StatusBadRequest)
@@ -25,7 +25,7 @@ func GetInitUploadSessionHandler(fUploadData *pfileUploadService.FileUploadServi
 		}
 
 		// 2. Create session
-		response, err := p_uploadSessionService.InitUploadSessionService(fUploadData, 0, 0, req.Filename, req.FileSize, pglobalConfigs.CHUNKSIZE)
+		response, err := p_uploadSessionService.InitUploadSessionService(fUploadData, 0, 19, req.Filename, req.FileSize, pglobalConfigs.CHUNKSIZE)
 		if err != nil {
 			http.Error(w, "Could not initiate upload", http.StatusInternalServerError)
 			return
